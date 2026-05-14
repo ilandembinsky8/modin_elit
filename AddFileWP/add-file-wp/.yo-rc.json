@@ -1,0 +1,25 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "whichFolder": "subdir",
+    "solutionName": "add-file-wp",
+    "isDomainIsolated": false,
+    "componentType": "webpart",
+    "template": "react",
+    "componentName": "AddFile",
+    "componentDescription": "Web Part for creating documents in SharePoint folders",
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "18.20.7",
+    "sdksVersions": {
+      "@microsoft/microsoft-graph-client": "3.0.2",
+      "@microsoft/teams-js": "2.24.0"
+    },
+    "version": "1.20.0",
+    "libraryName": "add-file-wp",
+    "libraryId": "760da2f6-9ccc-4706-83b8-01ef9772edd6",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionShortDescription": "add-file-wp description",
+    "skipFeatureDeployment": true
+  }
+}

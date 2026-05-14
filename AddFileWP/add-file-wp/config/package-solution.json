@@ -1,0 +1,46 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "add-file-wp-client-side-solution",
+    "id": "760da2f6-9ccc-4706-83b8-01ef9772edd6",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.20.0"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "add-file-wp description"
+      },
+      "longDescription": {
+        "default": "add-file-wp description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "webApiPermissionRequests": [
+      {
+        "resource": "Microsoft Graph",
+        "scope": "User.Read"
+      }
+    ],
+    "features": [
+      {
+        "title": "add-file-wp Feature",
+        "description": "The feature that activates elements of the add-file-wp solution.",
+        "id": "90971b2f-beb5-46bc-bd27-6f078527e6a5",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/add-file-wp.sppkg"
+  }
+}
