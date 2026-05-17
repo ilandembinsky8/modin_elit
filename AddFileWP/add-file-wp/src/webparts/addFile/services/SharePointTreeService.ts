@@ -25,6 +25,42 @@ export class SharePointTreeService {
   }
 
   /**
+   * Look up the user's department in the Departments list on the root site.
+   * Returns the SitePath value if found, or undefined if not.
+   */
+  public async getDepartmentSitePath(rootSiteUrl: string, departmentName: string): Promise<string | undefined> {
+    if (!departmentName) {
+      return undefined;
+    }
+
+    const filterValue = departmentName.replace(/'/g, "''");
+    const apiUrl = `${rootSiteUrl}/_api/web/lists/getbytitle('Departments')/items?$filter=Title eq '${filterValue}'&$select=Title,SitePath&$top=1`;
+
+    try {
+      const response: SPHttpClientResponse = await this._spHttpClient.get(
+        apiUrl,
+        SPHttpClient.configurations.v1,
+        { headers: { 'Accept': 'application/json;odata=nometadata' } }
+      );
+
+      if (!response.ok) {
+        console.warn('Failed to query Departments list:', response.statusText);
+        return undefined;
+      }
+
+      const data = await response.json();
+      if (data.value && data.value.length > 0 && data.value[0].SitePath) {
+        return data.value[0].SitePath;
+      }
+
+      return undefined;
+    } catch (error) {
+      console.warn('Error querying Departments list:', error);
+      return undefined;
+    }
+  }
+
+  /**
    * Load children for a site node: subsites + document libraries
    */
   public async loadSiteChildren(siteUrl: string): Promise<ITreeNode[]> {

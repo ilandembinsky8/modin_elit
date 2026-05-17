@@ -5,8 +5,11 @@ import { MessageBar, MessageBarType } from '@fluentui/react/lib/MessageBar';
 import { Spinner, SpinnerSize } from '@fluentui/react/lib/Spinner';
 import { Label } from '@fluentui/react/lib/Label';
 import { Link } from '@fluentui/react/lib/Link';
+import { Dropdown, IDropdownOption } from '@fluentui/react/lib/Dropdown';
+import { Icon } from '@fluentui/react/lib/Icon';
 import { LocationTreePicker } from './LocationTreePicker';
 import { ITreeNode } from '../models/ITreeNode';
+import { IDocumentType, DocumentTypes } from '../models/IDocumentType';
 import { SharePointTreeService } from '../services/SharePointTreeService';
 import { DocumentCreationService } from '../services/DocumentCreationService';
 import { UserProfileService, IUserProfile } from '../services/UserProfileService';
@@ -24,6 +27,7 @@ interface IDocumentCreatorState {
   rootNode: ITreeNode;
   selectedNode: ITreeNode | undefined;
   documentName: string;
+  selectedDocType: IDocumentType;
   isCreating: boolean;
   errorMessage: string;
   successMessage: string;
@@ -33,15 +37,27 @@ interface IDocumentCreatorState {
 }
 
 export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDocumentCreatorState> {
+
+  private _docTypeOptions: IDropdownOption[];
+
   constructor(props: IDocumentCreatorProps) {
     super(props);
 
     const rootNode = props.treeService.getRootNode(props.rootSiteUrl, props.rootSiteTitle);
 
+    this._docTypeOptions = DocumentTypes.map(function(dt) {
+      return {
+        key: dt.key,
+        text: dt.text,
+        data: { icon: dt.icon }
+      };
+    });
+
     this.state = {
       rootNode,
       selectedNode: undefined,
       documentName: '',
+      selectedDocType: DocumentTypes[0], // Default to Word
       isCreating: false,
       errorMessage: '',
       successMessage: '',
@@ -55,9 +71,24 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
     try {
       const userProfile = await this.props.userProfileService.getCurrentUser();
       this.setState({ userProfile });
+
+      // Look up department in Departments list to resolve tree root
+      if (userProfile.department) {
+        const sitePath = await this.props.treeService.getDepartmentSitePath(
+          this.props.rootSiteUrl,
+          userProfile.department
+        );
+
+        if (sitePath) {
+          // Build the subsite URL from the SitePath value
+          const departmentSiteUrl = this.props.rootSiteUrl.replace(/\/+$/, '') + '/' + sitePath;
+          const rootNode = this.props.treeService.getRootNode(departmentSiteUrl, userProfile.department + ' (' + sitePath + ')');
+          this.setState({ rootNode });
+        }
+      }
     } catch (error) {
       this.setState({
-        userProfileError: `Failed to load user profile: ${error instanceof Error ? error.message : String(error)}`
+        userProfileError: '\u05E9\u05D2\u05D9\u05D0\u05D4 \u05D1\u05D8\u05E2\u05D9\u05E0\u05EA \u05E4\u05E8\u05D5\u05E4\u05D9\u05DC \u05DE\u05E9\u05EA\u05DE\u05E9: ' + (error instanceof Error ? error.message : String(error))
       });
     }
   }
@@ -67,6 +98,7 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
       rootNode,
       selectedNode,
       documentName,
+      selectedDocType,
       isCreating,
       errorMessage,
       successMessage,
@@ -81,9 +113,22 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
       !isCreating &&
       userProfile !== undefined;
 
+    // Show file name preview
+    let fileNamePreview = '';
+    if (documentName.trim()) {
+      let cleanName = documentName.trim().replace(/[~"#%&*:<>?/\\{|}]/g, '');
+      const dotIdx = cleanName.lastIndexOf('.');
+      if (dotIdx > 0) {
+        cleanName = cleanName.substring(0, dotIdx);
+      }
+      if (cleanName) {
+        fileNamePreview = cleanName + selectedDocType.extension;
+      }
+    }
+
     return (
       <div className={styles.documentCreator}>
-        <h2 className={styles.heading}>Create Document</h2>
+        <h2 className={styles.heading}>{'\u05D9\u05E6\u05D9\u05E8\u05EA \u05DE\u05E1\u05DE\u05DA'}</h2>
 
         {userProfileError && (
           <MessageBar messageBarType={MessageBarType.warning} className={styles.messageBar}>
@@ -93,32 +138,50 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
 
         {userProfile && (
           <div className={styles.userInfo}>
-            <Label>Logged in as: {userProfile.displayName}</Label>
-            {userProfile.department && <Label>Department: {userProfile.department}</Label>}
+            <Label>{'\u05DE\u05D7\u05D5\u05D1\u05E8 \u05DB: '}{userProfile.displayName}</Label>
+            {userProfile.department && <Label>{'\u05DE\u05D7\u05DC\u05E7\u05D4: '}{userProfile.department}</Label>}
           </div>
         )}
 
         <div className={styles.formSection}>
-          <TextField
-            label="Document Name"
-            placeholder="Enter document name (e.g., MyDocument or MyDocument.txt)"
-            value={documentName}
-            onChange={this._onDocumentNameChange}
+          <Dropdown
+            label={'\u05E1\u05D5\u05D2 \u05DE\u05E1\u05DE\u05DA'}
+            selectedKey={selectedDocType.key}
+            options={this._docTypeOptions}
+            onChange={this._onDocTypeChange}
             disabled={isCreating}
+            onRenderOption={this._onRenderDocTypeOption}
+            onRenderTitle={this._onRenderDocTypeTitle}
           />
         </div>
 
         <div className={styles.formSection}>
-          <Label>Select target folder:</Label>
+          <TextField
+            label={'\u05E9\u05DD \u05DE\u05E1\u05DE\u05DA'}
+            placeholder={'\u05D4\u05D6\u05DF \u05E9\u05DD \u05DE\u05E1\u05DE\u05DA (\u05DC\u05DC\u05D0 \u05E1\u05D9\u05D5\u05DE\u05EA)'}
+            value={documentName}
+            onChange={this._onDocumentNameChange}
+            disabled={isCreating}
+          />
+          {fileNamePreview && (
+            <div className={styles.filePreview}>
+              <Icon iconName={selectedDocType.icon} className={styles.filePreviewIcon} />
+              <span>{fileNamePreview}</span>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.formSection}>
+          <Label>{'\u05D1\u05D7\u05E8 \u05EA\u05D9\u05E7\u05D9\u05D9\u05EA \u05D9\u05E2\u05D3:'}</Label>
           {selectedNode && (
             <div className={styles.selectedLocation}>
-              Selected: <strong>{selectedNode.serverRelativeUrl || selectedNode.title}</strong>
+              {'\u05E0\u05D1\u05D7\u05E8: '}<strong>{selectedNode.serverRelativeUrl || selectedNode.title}</strong>
             </div>
           )}
           <div className={styles.treeContainer}>
             <LocationTreePicker
               rootNode={rootNode}
-              selectedNodeId={selectedNode?.id}
+              selectedNodeId={selectedNode ? selectedNode.id : undefined}
               onNodeSelect={this._onNodeSelect}
               onNodeExpand={this._onNodeExpand}
             />
@@ -127,7 +190,7 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
 
         <div className={styles.formSection}>
           <PrimaryButton
-            text={isCreating ? 'Creating...' : 'Create Document'}
+            text={isCreating ? '\u05D9\u05D5\u05E6\u05E8...' : '\u05E6\u05D5\u05E8 \u05DE\u05E1\u05DE\u05DA'}
             onClick={this._onCreateDocument}
             disabled={!canCreate}
           />
@@ -138,7 +201,7 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
           <MessageBar
             messageBarType={MessageBarType.error}
             className={styles.messageBar}
-            onDismiss={() => this.setState({ errorMessage: '' })}
+            onDismiss={this._dismissError}
           >
             {errorMessage}
           </MessageBar>
@@ -148,18 +211,53 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
           <MessageBar
             messageBarType={MessageBarType.success}
             className={styles.messageBar}
-            onDismiss={() => this.setState({ successMessage: '', createdFileUrl: '' })}
+            onDismiss={this._dismissSuccess}
           >
             {successMessage}
             {createdFileUrl && (
               <div>
-                <Link href={createdFileUrl} target="_blank">Open file</Link>
+                <Link href={createdFileUrl} target="_blank">{'\u05E4\u05EA\u05D7 \u05E7\u05D5\u05D1\u05E5'}</Link>
               </div>
             )}
           </MessageBar>
         )}
       </div>
     );
+  }
+
+  private _onRenderDocTypeOption = (option?: IDropdownOption): JSX.Element | null => {
+    if (!option) return null;
+    return (
+      <div className={styles.docTypeOption}>
+        <Icon iconName={option.data ? option.data.icon : 'Document'} className={styles.docTypeIcon} />
+        <span>{option.text}</span>
+      </div>
+    );
+  }
+
+  private _onRenderDocTypeTitle = (options?: IDropdownOption[]): JSX.Element | null => {
+    if (!options || options.length === 0) return null;
+    const option = options[0];
+    return (
+      <div className={styles.docTypeOption}>
+        <Icon iconName={option.data ? option.data.icon : 'Document'} className={styles.docTypeIcon} />
+        <span>{option.text}</span>
+      </div>
+    );
+  }
+
+  private _onDocTypeChange = (_ev: React.FormEvent<HTMLDivElement>, option?: IDropdownOption): void => {
+    if (!option) return;
+    let found: IDocumentType | undefined;
+    for (let i = 0; i < DocumentTypes.length; i++) {
+      if (DocumentTypes[i].key === option.key) {
+        found = DocumentTypes[i];
+        break;
+      }
+    }
+    if (found) {
+      this.setState({ selectedDocType: found });
+    }
   }
 
   private _onDocumentNameChange = (_ev: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>, newValue?: string): void => {
@@ -196,7 +294,7 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
       }
 
       this._updateNodeInTree(this.state.rootNode, node.id, {
-        children,
+        children: children,
         isLoaded: true,
         isLoading: false
       });
@@ -210,16 +308,17 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
 
   private _updateNodeInTree(node: ITreeNode, targetId: string, updates: Partial<ITreeNode>): boolean {
     if (node.id === targetId) {
-      const keys = Object.keys(updates) as Array<keyof ITreeNode>;
-      for (const key of keys) {
+      const keys = Object.keys(updates);
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (node as any)[key] = (updates as any)[key];
       }
       return true;
     }
     if (node.children) {
-      for (const child of node.children) {
-        if (this._updateNodeInTree(child, targetId, updates)) {
+      for (let j = 0; j < node.children.length; j++) {
+        if (this._updateNodeInTree(node.children[j], targetId, updates)) {
           return true;
         }
       }
@@ -227,8 +326,16 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
     return false;
   }
 
+  private _dismissError = (): void => {
+    this.setState({ errorMessage: '' });
+  }
+
+  private _dismissSuccess = (): void => {
+    this.setState({ successMessage: '', createdFileUrl: '' });
+  }
+
   private _onCreateDocument = async (): Promise<void> => {
-    const { selectedNode, documentName, userProfile } = this.state;
+    const { selectedNode, documentName, selectedDocType, userProfile } = this.state;
 
     if (!selectedNode || !selectedNode.serverRelativeUrl || !userProfile) {
       return;
@@ -241,16 +348,29 @@ export class DocumentCreator extends React.Component<IDocumentCreatorProps, IDoc
         selectedNode.webUrl,
         selectedNode.serverRelativeUrl,
         documentName,
+        selectedDocType,
         userProfile
       );
 
-      // Build a link to the file
-      const origin = new URL(selectedNode.webUrl).origin;
-      const fileAbsoluteUrl = `${origin}${fileRelativeUrl}`;
+      // Build a link to the file - use Office Online URL for Office documents
+      let origin = selectedNode.webUrl;
+      try {
+        origin = new URL(selectedNode.webUrl).origin;
+      } catch (ex) {
+        console.debug('URL parse fallback', ex);
+      }
+
+      let fileAbsoluteUrl: string;
+      if (selectedDocType.onlinePrefix) {
+        // Office Online format: {origin}/:w:/r{serverRelativeUrl}?csf=1&web=1
+        fileAbsoluteUrl = origin + '/' + selectedDocType.onlinePrefix + '/r' + fileRelativeUrl + '?csf=1&web=1';
+      } else {
+        fileAbsoluteUrl = origin + fileRelativeUrl;
+      }
 
       this.setState({
         isCreating: false,
-        successMessage: `Document created successfully!`,
+        successMessage: '\u05D4\u05DE\u05E1\u05DE\u05DA \u05E0\u05D5\u05E6\u05E8 \u05D1\u05D4\u05E6\u05DC\u05D7\u05D4!',
         createdFileUrl: fileAbsoluteUrl,
         documentName: ''
       });
